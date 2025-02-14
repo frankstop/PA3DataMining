@@ -44,17 +44,18 @@
   <div class="section" id="overview">
     <h3>Overview</h3>
     <p>
-      In this app, we explore salary distributions through a histogram, boxplots, scatter plots,
-      quantile plots, and a Q-Q plot. We also compare two salary datasets.
+      In this app, we explore salary distributions through a histogram (manually computed),
+      boxplots, scatter plots, quantile plots, and a Q-Q plot. We also compare two salary datasets.
     </p>
   </div>
 
-  <!-- Section 1: Histogram with Animation -->
+  <!-- Section 1: Histogram without Animation -->
   <div class="section" id="section-histogram">
     <h2>Histogram of Salary Data (Dataset 1)</h2>
     <div class="control-panel">
       <label for="binSlider" class="inline-control">Select number of bins:</label>
-      <input type="range" id="binSlider" min="5" max="30" value="10" />
+      <!-- Slider from 5 to 20 -->
+      <input type="range" id="binSlider" min="5" max="20" value="10" />
       <span id="binValue">10</span>
     </div>
     <div id="histogram" class="chart"></div>
@@ -142,7 +143,7 @@
     const data1 = [45, 50, 52, 55, 60, 62, 65, 67, 70, 72, 75, 78, 80, 85, 88, 90, 95, 100, 105, 110, 120, 125, 130, 140, 150, 160, 170, 180, 200, 220, 400, 500];
     const data2 = [48, 53, 55, 58, 62, 65, 68, 71, 74, 76, 79, 82, 85, 90, 93, 96, 100, 105, 110, 115, 125, 132, 138, 145, 155, 165, 175, 185, 210, 230, 380, 450];
 
-    // Returns a sorted copy (numerical sort)
+    // Helper to sort an array numerically
     function sortNumeric(arr) {
       return arr.slice().sort((a, b) => a - b);
     }
@@ -160,43 +161,75 @@
       }
     }
 
+    /**
+     * Manually compute histogram bin centers and frequencies so we get EXACT bin counts.
+     * @param {number[]} arr The data array.
+     * @param {number} binCount The number of bins.
+     * @returns {{binCenters: number[], freq: number[]}} bin centers and frequencies
+     */
+    function computeHistogram(arr, binCount) {
+      const xMin = Math.min(...arr);
+      const xMax = Math.max(...arr);
+      const range = xMax - xMin;
+      const binSize = range / binCount;
+
+      // Initialize frequency array
+      const freq = new Array(binCount).fill(0);
+
+      // Count how many data points fall into each bin
+      for (const val of arr) {
+        let index = Math.floor((val - xMin) / binSize);
+        // If val is exactly xMax, index can be binCount. Clamp it:
+        if (index === binCount) index = binCount - 1;
+        freq[index]++;
+      }
+
+      // Compute bin centers for plotting on x-axis
+      const binCenters = [];
+      for (let i = 0; i < binCount; i++) {
+        const left = xMin + i * binSize;
+        const right = left + binSize;
+        binCenters.push((left + right) / 2);
+      }
+
+      return { binCenters, freq };
+    }
+
     // ---------------------------
-    // Section 1: Histogram with Animation
+    // Section 1: Manual Histogram
     // ---------------------------
     const binSlider = document.getElementById('binSlider');
     const binValueSpan = document.getElementById('binValue');
     const histogramDiv = document.getElementById('histogram');
 
-    // When slider changes, update display and run animation
-    binSlider.addEventListener('input', function () {
-      binValueSpan.textContent = binSlider.value;
-      animateHistogram(parseInt(binSlider.value));
-    });
+    function renderHistogram() {
+      const binCount = parseInt(binSlider.value, 10);
+      binValueSpan.textContent = binCount;
 
-    function animateHistogram(targetBins) {
-      let currentBins = 5; // starting bin count
-      // Function to update the histogram
-      function update() {
-        if (currentBins > targetBins) return;
-        Plotly.newPlot(histogramDiv, [{
-          x: data1,
-          type: 'histogram',
-          nbinsx: currentBins,
-          marker: { color: 'skyblue', line: { color: 'black', width: 1 } }
-        }], {
-          title: `Histogram with ${currentBins} bins`,
-          xaxis: { title: "Salary" },
-          yaxis: { title: "Frequency" }
-        });
-        currentBins++;
-        if (currentBins <= targetBins) {
-          setTimeout(update, 200);
+      // Compute the bin centers and frequencies manually
+      const { binCenters, freq } = computeHistogram(data1, binCount);
+
+      // Build a bar chart with EXACT binCount bars
+      const trace = {
+        x: binCenters,
+        y: freq,
+        type: 'bar',
+        marker: {
+          color: 'skyblue',
+          line: { color: 'black', width: 1 }
         }
-      }
-      update();
+      };
+      const layout = {
+        title: `Histogram with ${binCount} bins`,
+        xaxis: { title: "Salary" },
+        yaxis: { title: "Frequency" }
+      };
+
+      Plotly.react(histogramDiv, [trace], layout);
     }
-    // Draw initial histogram
-    animateHistogram(parseInt(binSlider.value));
+
+    binSlider.addEventListener('input', renderHistogram);
+    renderHistogram();
 
     // ---------------------------
     // Section 2: Boxplot and Outlier Analysis
@@ -498,7 +531,7 @@
       
       // Add an interactive marker if the checkbox is checked.
       if (interactiveCheckbox.checked) {
-        const markerPercent = parseInt(interactiveSlider.value);
+        const markerPercent = parseInt(interactiveSlider.value, 10);
         if (orientation === 'Vertical') {
           dataTraces.push({
             x: [markerPercent, markerPercent],
